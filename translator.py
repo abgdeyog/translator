@@ -2,43 +2,24 @@ import tensorflow as tf
 import numpy as np
 import unicodedata
 import re
-
-# raw_data = (
-#     ('What a ridiculous concept!', 'Quel concept ridicule !'),
-#     ('Your idea is not entirely crazy.', "Votre idée n'est pas complètement folle."),
-#     ("A man's worth lies in what he is.", "La valeur d'un homme réside dans ce qu'il est."),
-#     ('What he did is very wrong.', "Ce qu'il a fait est très mal."),
-#     ("All three of you need to do that.", "Vous avez besoin de faire cela, tous les trois."),
-#     ("Are you giving me another chance?", "Me donnez-vous une autre chance ?"),
-#     ("Both Tom and Mary work as models.", "Tom et Mary travaillent tous les deux comme mannequins."),
-#     ("Can I have a few minutes, please?", "Puis-je avoir quelques minutes, je vous prie ?"),
-#     ("Could you close the door, please?", "Pourriez-vous fermer la porte, s'il vous plaît ?"),
-#     ("Did you plant pumpkins this year?", "Cette année, avez-vous planté des citrouilles ?"),
-#     ("Do you ever study in the library?", "Est-ce que vous étudiez à la bibliothèque des fois ?"),
-#     ("Don't be deceived by appearances.", "Ne vous laissez pas abuser par les apparences."),
-#     ("Excuse me. Can you speak English?", "Je vous prie de m'excuser ! Savez-vous parler anglais ?"),
-#     ("Few people know the true meaning.", "Peu de gens savent ce que cela veut réellement dire."),
-#     ("Germany produced many scientists.", "L'Allemagne a produit beaucoup de scientifiques."),
-#     ("Guess whose birthday it is today.", "Devine de qui c'est l'anniversaire, aujourd'hui !"),
-#     ("He acted like he owned the place.", "Il s'est comporté comme s'il possédait l'endroit."),
-#     ("Honesty will pay in the long run.", "L'honnêteté paye à la longue."),
-#     ("How do we know this isn't a trap?", "Comment savez-vous qu'il ne s'agit pas d'un piège ?"),
-#     ("I can't believe you're giving up.", "Je n'arrive pas à croire que vous abandonniez."),
-# )
+from sklearn.model_selection import train_test_split
 
 ru_file = open("data/corpus.en_ru.1m.ru", "r")
 en_file = open("data/corpus.en_ru.1m.en", "r")
 ru_sent = ru_file.readline()
 en_sent = en_file.readline()
-raw_data = []
+raw_data_en_all = []
+raw_data_fr_all = []
 
 count = 0
 
-while ru_sent and en_sent and count < 10:
+while ru_sent and en_sent and count < 200:
     count += 1
-    raw_data.append((ru_sent, en_sent))
+    raw_data_en_all.append(ru_sent)
+    raw_data_fr_all.append(en_sent)
     ru_sent = ru_file.readline()
     en_sent = en_file.readline()
+
 
 
 def unicode_to_ascii(s):
@@ -48,21 +29,23 @@ def unicode_to_ascii(s):
 
 
 def normalize_string(s):
-    s = unicode_to_ascii(s)
+    # s = unicode_to_ascii(s)
     s = re.sub(r'([!.?])', r' \1', s)
-    s = re.sub(r'[^a-zA-Z.!?]+', r' ', s)
+    # s = re.sub(r'[^a-zA-Z.!?]+', r' ', s)
     s = re.sub(r'\s+', r' ', s)
     return s
 
+raw_data_en = raw_data_en_all
+raw_data_fr = raw_data_fr_all
+#
+# raw_data_en, test_sents, raw_data_fr, test_y = train_test_split(raw_data_en_all, raw_data_fr_all, test_size=0.33, random_state=42)
 
-raw_data_en, raw_data_fr = list(zip(*raw_data))
-raw_data_en, raw_data_fr = list(raw_data_en), list(raw_data_fr)
 raw_data_en = [normalize_string(data) for data in raw_data_en]
 raw_data_fr_in = ['<start> ' + normalize_string(data) for data in raw_data_fr]
 raw_data_fr_out = [normalize_string(data) + ' <end>' for data in raw_data_fr]
 
 en_tokenizer = tf.keras.preprocessing.text.Tokenizer(filters='')
-en_tokenizer.fit_on_texts(raw_data_en)
+en_tokenizer.fit_on_texts(raw_data_en_all)
 data_en = en_tokenizer.texts_to_sequences(raw_data_en)
 data_en = tf.keras.preprocessing.sequence.pad_sequences(data_en,
                                                         padding='post')
@@ -154,9 +137,9 @@ optimizer = tf.keras.optimizers.Adam()
 def predict(test_source_text=None):
     if test_source_text is None:
         test_source_text = raw_data_en[np.random.choice(len(raw_data_en))]
-    print(test_source_text)
+    # print(test_source_text)
     test_source_seq = en_tokenizer.texts_to_sequences([test_source_text])
-    print(test_source_seq)
+    # print(test_source_seq)
 
     en_initial_states = encoder.init_states(1)
     en_outputs = encoder(tf.constant(test_source_seq), en_initial_states)
@@ -174,7 +157,7 @@ def predict(test_source_text=None):
         if out_words[-1] == '<end>' or len(out_words) >= 20:
             break
 
-    print(' '.join(out_words))
+    # print(' '.join(out_words))
 
 
 @tf.function
@@ -209,13 +192,8 @@ for e in range(NUM_EPOCHS):
 
     print('Epoch {} Loss {:.4f}'.format(e + 1, loss.numpy()))
 
-test_sents = []
-ru_sent = ru_file.readline()
-while ru_sent and en_sent and count < 10:
-    count += 1
-    test_sents.append(ru_sent)
-    ru_sent = ru_file.readline()
 
-for test_sent in test_sents:
-    test_sequence = normalize_string(test_sent)
-    predict(test_sequence)
+
+# for test_sent in test_sents:
+#     test_sequence = normalize_string(test_sent)
+#     predict(test_sequence)
